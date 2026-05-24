@@ -36,7 +36,7 @@ body {
 
 /* HEADER */
 .header {
-  background: #000;
+  background: var(--navy);
   border-radius: var(--radius);
   padding: 0 1.5rem 0 0;
   margin-bottom: 1.25rem;
@@ -61,7 +61,8 @@ body {
   align-items: center;
   flex-shrink: 0;
   height: 90px;
-  background: #000;
+  background: #fff;
+padding: 0 12px;
 }
 
 .header-logo {
