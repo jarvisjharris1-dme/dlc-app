@@ -62,7 +62,7 @@ body {
   flex-shrink: 0;
   height: 90px;
   background: #fff;
-padding: 0 12px;
+  padding: 0 12px;
 }
 
 .header-logo {
@@ -307,6 +307,29 @@ input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color:
 .assignee-name { flex: 1; font-size: 14px; }
 .add-assignee-row { display: flex; gap: 8px; align-items: center; }
 .add-assignee-row input { flex: 1; font-family: 'DM Sans', sans-serif; padding: 8px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; }
+
+/* SPINNER */
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ERROR BANNER */
+.error-banner {
+  background: var(--red-light);
+  color: var(--red);
+  border: 1px solid #F7C1C1;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 500;
+}
+.error-banner button { background: none; border: none; cursor: pointer; color: var(--red); font-size: 16px; }
 
 @media (max-width: 768px) {
   .app { padding: 1rem; }
