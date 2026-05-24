@@ -33,13 +33,19 @@ const emptyMember = () => ({
 });
 
 export default function App() {
+  // Clear legacy localStorage data so Supabase is always the source of truth
+  useEffect(() => {
+    localStorage.removeItem('dlc_members');
+    localStorage.removeItem('dlc_assignees');
+  }, []);
+
   const [members, setMembers] = useState([]);
   const [assignees, setAssignees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const [fYear, setFYear] = useState(new Date().getFullYear().toString());
+  const [fYear, setFYear] = useState('');
   const [fMonth, setFMonth] = useState('');
   const [fSearch, setFSearch] = useState('');
   const [fAssignee, setFAssignee] = useState('');
@@ -97,12 +103,15 @@ export default function App() {
 
   // ── Filtered list ────────────────────────────────────────────
   const filtered = members.filter(m => {
-    const d = new Date((m.enroll_date || todayStr()) + 'T00:00:00');
-    const fy = fYear ? d.getFullYear().toString() === fYear : true;
-    const fm = fMonth !== '' ? d.getMonth() === parseInt(fMonth) : true;
-    const fs = fSearch ? (m.first_name + ' ' + m.last_name).toLowerCase().includes(fSearch.toLowerCase()) : true;
-    const fa = fAssignee ? m.assigned_to === fAssignee : true;
-    return fy && fm && fs && fa;
+    try {
+      const dateStr = (m.enroll_date || todayStr()).slice(0, 10);
+      const [yr, mo] = dateStr.split('-').map(Number);
+      const fy = fYear ? yr.toString() === fYear : true;
+      const fm = fMonth !== '' ? (mo - 1) === parseInt(fMonth) : true;
+      const fs = fSearch ? (m.first_name + ' ' + m.last_name).toLowerCase().includes(fSearch.toLowerCase()) : true;
+      const fa = fAssignee ? m.assigned_to === fAssignee : true;
+      return fy && fm && fs && fa;
+    } catch { return true; }
   });
 
   const total = filtered.length;
