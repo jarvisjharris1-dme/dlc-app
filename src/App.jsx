@@ -75,7 +75,7 @@ export default function App() {
     setError(null);
     try {
       const [{ data: mData, error: mErr }, { data: aData, error: aErr }] = await Promise.all([
-        supabase.from('members').select('*').order('created_at', { ascending: true }),
+        supabase.from('members').select('*').order('last_name', { ascending: true }).order('first_name', { ascending: true }),
         supabase.from('assignees').select('*').order('name'),
       ]);
       if (mErr) throw mErr;
