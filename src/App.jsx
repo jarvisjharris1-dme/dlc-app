@@ -6,8 +6,11 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 function getMonthYear(d) {
   if (!d) return '';
-  const x = new Date(d + 'T00:00:00');
-  return MONTHS[x.getMonth()] + ' ' + x.getFullYear();
+  const parts = d.slice(0, 10).split('-');
+  if (parts.length < 3) return '';
+  const yr = parts[0];
+  const mo = parseInt(parts[1], 10) - 1;
+  return MONTHS[mo] + ' ' + yr;
 }
 function avatarInitials(name) {
   return (name || '').split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
@@ -846,4 +849,5 @@ export default function App() {
     </div>
   );
 }
+
 
