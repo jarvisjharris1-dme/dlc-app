@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import "./App.css";
@@ -255,23 +256,82 @@ export default function App() {
   }
 
   // ── CSV Import ───────────────────────────────────────────────
+  // Smart CSV parser — handles quoted fields, messy data, multi-line values
+  function parseCSVLine(line) {
+    const result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        result.push(cur.trim()); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  // Parse a messy date string — extracts just the date portion
+  function parseDate(raw) {
+    if (!raw) return '';
+    // Strip everything after the date (initials, notes like "CLvir", "acc", etc.)
+    const clean = raw.replace(/[a-zA-Z()><\/]/g, ' ').trim();
+    // Try MM/DD/YYYY
+    const m1 = clean.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+    if (m1) {
+      let [, mo, dy, yr] = m1;
+      if (yr.length === 2) yr = '20' + yr;
+      return `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+    }
+    return '';
+  }
+
+  // Check if a cell means "yes/attended"
+  function isAttended(val) {
+    if (!val) return false;
+    const v = val.trim().toUpperCase();
+    if (!v || v.startsWith('X') || v === 'NO' || v === 'N/A') return false;
+    // If it has a date pattern or YES it counts as attended
+    return v === 'YES' || /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(v);
+  }
+
+  function isYes(val) {
+    if (!val) return false;
+    const v = val.trim().toUpperCase();
+    return v === 'YES' || v === 'Y';
+  }
+
   function handleCSVFile(file) {
     const reader = new FileReader();
     reader.onload = e => {
       const lines = e.target.result.split('\n').filter(l => l.trim());
-      const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-      const rows = lines.slice(1).map(line => {
-        const vals = line.split(',').map(v => v.replace(/^"|"$/g, '').trim());
-        const obj = {};
-        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
-        return obj;
-      }).filter(r => Object.values(r).some(v => v));
+      const headers = parseCSVLine(lines[0]);
       setCsvHeaders(headers);
+
+      // Skip row 2 if it looks like a sub-header (no first/last name data)
+      const dataStart = lines.length > 1 && !parseCSVLine(lines[1])[0].trim().match(/^[A-Za-z]/) ? 2 : 1;
+      const rows = lines.slice(dataStart).map(l => {
+        const vals = parseCSVLine(l);
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+        return obj;
+      }).filter(r => {
+        // Skip rows with no first or last name
+        const fn = r[headers[0]] || '';
+        const ln = r[headers[1]] || '';
+        return fn.trim() && ln.trim();
+      });
+
       setCsvRows(rows);
       setCsvMap({
-        fn: headers.find(h => /first/i.test(h)) || headers[0] || '',
-        ln: headers.find(h => /last/i.test(h)) || headers[1] || '',
-        ed: headers.find(h => /date|enroll/i.test(h)) || '',
+        fn: headers[0] || '',
+        ln: headers[1] || '',
+        ed: headers.find(h => /date.joined|enroll|date/i.test(h)) || headers[3] || '',
       });
       setIStep(2);
     };
@@ -282,8 +342,9 @@ export default function App() {
     const prev = csvRows.slice(0, 5).map(row => {
       const fn = (row[csvMap.fn] || '').trim();
       const ln = (row[csvMap.ln] || '').trim();
-      const dup = members.some(m => m.first_name.toLowerCase() === fn.toLowerCase() && m.last_name.toLowerCase() === ln.toLowerCase());
-      return { fn, ln, ed: (row[csvMap.ed] || '').trim() || todayStr(), dup };
+      const dup = members.some(m => m.first_name.toLowerCase().trim() === fn.toLowerCase() && m.last_name.toLowerCase().trim() === ln.toLowerCase());
+      const ed = parseDate(row[csvMap.ed] || '') || todayStr();
+      return { fn, ln, ed, dup };
     });
     setIPreview(prev); setIStep(3);
   }
@@ -295,13 +356,66 @@ export default function App() {
       const fn = (row[csvMap.fn] || '').trim();
       const ln = (row[csvMap.ln] || '').trim();
       if (!fn || !ln) return;
-      if (members.some(m => m.first_name.toLowerCase() === fn.toLowerCase() && m.last_name.toLowerCase() === ln.toLowerCase())) return;
-      toInsert.push({ first_name: fn, last_name: ln, enroll_date: (row[csvMap.ed] || '').trim() || todayStr(), class_1: false, class_2: false, class_3: false, class_4: false, photo_taken: false, app_complete: false, luncheon_attended: false, assigned_to: '', notes: '', initials: '', pastor_assigned: '', certificate_date: null, connect_group: '' });
+      if (members.some(m => m.first_name.toLowerCase().trim() === fn.toLowerCase() && m.last_name.toLowerCase().trim() === ln.toLowerCase())) return;
+
+      // Smart field detection — works with Shelby Next AND the DLC tracker format
+      const headers = csvHeaders;
+      const dateJoined = parseDate(row[csvMap.ed] || '');
+      const enrollDate = dateJoined || todayStr();
+
+      // Detect session/class columns — any column with SESSION, CLASS, or S1-S4 pattern
+      const sessionCols = headers.filter(h => /session|class\s*[1-4]|s[1-4]/i.test(h));
+      // Fall back to columns 6-9 (0-indexed) if no named session columns found
+      const classCols = sessionCols.length >= 4 ? sessionCols.slice(0, 4) : headers.slice(6, 10);
+
+      const class1 = isAttended(row[classCols[0]]);
+      const class2 = isAttended(row[classCols[1]]);
+      const class3 = isAttended(row[classCols[2]]);
+      const class4 = isAttended(row[classCols[3]]);
+
+      // Photo — PICTURE column or similar
+      const photoCol = headers.find(h => /pic|photo/i.test(h));
+      const photoTaken = photoCol ? isYes(row[photoCol]) : false;
+
+      // Application — APPLICATION column
+      const appCol = headers.find(h => /applic|app/i.test(h));
+      const appComplete = appCol ? isYes(row[appCol]) : false;
+
+      // Certificate date — CERTIFICATE column
+      const certCol = headers.find(h => /cert/i.test(h));
+      const certDate = certCol ? parseDate(row[certCol]) : '';
+
+      // Connect group — CONNECT GROUP column
+      const cgCol = headers.find(h => /connect.group|group.assign/i.test(h));
+      const connectGroup = cgCol ? (row[cgCol] || '').trim() : '';
+
+      // Comments/notes
+      const notesCols = headers.find(h => /comment|note/i.test(h));
+      const notes = notesCols ? (row[notesCols] || '').trim() : '';
+
+      toInsert.push({
+        first_name: fn,
+        last_name: ln,
+        enroll_date: enrollDate,
+        class_1: class1,
+        class_2: class2,
+        class_3: class3,
+        class_4: class4,
+        photo_taken: photoTaken,
+        app_complete: appComplete,
+        luncheon_attended: false,
+        assigned_to: '',
+        notes: notes,
+        initials: '',
+        pastor_assigned: '',
+        certificate_date: certDate || null,
+        connect_group: connectGroup,
+      });
     });
     const skipped = csvRows.length - toInsert.length;
     if (toInsert.length > 0) {
       const { error } = await supabase.from('members').insert(toInsert);
-      if (error) { setError('Import failed.'); setSaving(false); return; }
+      if (error) { setError('Import failed: ' + (error.message || JSON.stringify(error))); setSaving(false); return; }
     }
     await fetchAll();
     setIResult({ added: toInsert.length, skipped });
@@ -721,4 +835,3 @@ export default function App() {
     </div>
   );
 }
-
