@@ -1,5 +1,4 @@
-
-  import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import "./App.css";
 
@@ -58,6 +57,8 @@ export default function App() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyMember());
   const [newAssignee, setNewAssignee] = useState('');
+  const [newPastor, setNewPastor] = useState('');
+  const [newConnectGroup, setNewConnectGroup] = useState('');
 
   // Import state
   const [iTab, setITab] = useState('csv');
@@ -199,7 +200,43 @@ export default function App() {
     await fetchAll();
   }
 
-  // ── Export CSV ───────────────────────────────────────────────
+  // ── Pastors ──────────────────────────────────────────────────
+  async function addPastor() {
+    const n = newPastor.trim();
+    if (!n || pastors.includes(n)) return;
+    const { error } = await supabase.from('pastors').insert({ name: n });
+    if (error) { setError('Could not add pastor.'); return; }
+    setPastors(prev => [...prev, n].sort());
+    setNewPastor('');
+  }
+  async function removePastor(name) {
+    if (members.some(m => m.pastor_assigned === name)) {
+      if (!confirm(`${name} is assigned to members. Remove anyway?`)) return;
+      await supabase.from('members').update({ pastor_assigned: '' }).eq('pastor_assigned', name);
+    }
+    await supabase.from('pastors').delete().eq('name', name);
+    await fetchAll();
+  }
+
+  // ── Connect Groups ────────────────────────────────────────────
+  async function addConnectGroup() {
+    const n = newConnectGroup.trim();
+    if (!n || connectGroups.includes(n)) return;
+    const { error } = await supabase.from('connect_groups').insert({ name: n });
+    if (error) { setError('Could not add connect group.'); return; }
+    setConnectGroups(prev => [...prev, n].sort());
+    setNewConnectGroup('');
+  }
+  async function removeConnectGroup(name) {
+    if (members.some(m => m.connect_group === name)) {
+      if (!confirm(`${name} is assigned to members. Remove anyway?`)) return;
+      await supabase.from('members').update({ connect_group: '' }).eq('connect_group', name);
+    }
+    await supabase.from('connect_groups').delete().eq('name', name);
+    await fetchAll();
+  }
+
+  // ── Export CSV ───────────────────────────────────────────────────────────────
   function exportCSV() {
     const rows = [['First Name','Last Name','Enrollment Date','Class 1','Class 2','Class 3','Class 4','Classes Attended','Photo Taken','Application Complete','Luncheon Attended','Assigned To','Pastor Assigned','Certificate Date','Connect Group','Notes','Teacher Initials','Status']];
     filtered.forEach(m => {
@@ -350,7 +387,9 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
-          <button className="btn" onClick={() => setModal('assignees')}>👥 Manage assignees</button>
+          <button className="btn" onClick={() => setModal('assignees')}>👥 Assignees</button>
+          <button className="btn" onClick={() => setModal('pastors')}>✝ Pastors</button>
+          <button className="btn" onClick={() => setModal('connectgroups')}>🔗 Connect Groups</button>
           <button className="btn btn-amber" onClick={() => { setModal('import'); setITab('csv'); setIStep(1); }}>⬆ Import</button>
           <button className="btn btn-success" onClick={exportCSV}>⬇ Export CSV</button>
           <button className="btn btn-primary" onClick={openAdd}>+ Add member</button>
@@ -387,7 +426,7 @@ export default function App() {
       </div>
 
       {/* TABLE */}
-      <div className="table-wrap">
+      <div className="table-wrap table-scroll">
         <table>
           <thead>
             <tr>
@@ -528,6 +567,56 @@ export default function App() {
             <div className="add-assignee-row">
               <input type="text" placeholder="Add name (e.g. Elder Brown)" value={newAssignee} onChange={e => setNewAssignee(e.target.value)} onKeyDown={e => e.key === 'Enter' && addAssignee()} autoFocus />
               <button className="btn btn-primary" onClick={addAssignee}>+ Add</button>
+            </div>
+            <div className="modal-footer"><button className="btn btn-primary" onClick={closeModal}>✓ Done</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* PASTORS MODAL */}
+      {modal === 'pastors' && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="modal">
+            <h2>✝ Manage Pastors</h2>
+            <p className="modal-sub">These names populate the "Pastor Assigned" dropdown on each member record.</p>
+            <div className="assignee-list">
+              {pastors.map(p => (
+                <div key={p} className="assignee-row">
+                  <span className="assignee-avatar">{avatarInitials(p)}</span>
+                  <span className="assignee-name">{p}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => removePastor(p)}>Remove</button>
+                </div>
+              ))}
+              {pastors.length === 0 && <p style={{padding:'12px',color:'var(--text-muted)',fontSize:13}}>No pastors added yet.</p>}
+            </div>
+            <div className="add-assignee-row">
+              <input type="text" placeholder="Add pastor name (e.g. Pastor Williams)" value={newPastor} onChange={e => setNewPastor(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPastor()} autoFocus />
+              <button className="btn btn-primary" onClick={addPastor}>+ Add</button>
+            </div>
+            <div className="modal-footer"><button className="btn btn-primary" onClick={closeModal}>✓ Done</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* CONNECT GROUPS MODAL */}
+      {modal === 'connectgroups' && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="modal">
+            <h2>🔗 Manage Connect Groups</h2>
+            <p className="modal-sub">These names populate the "Connect Group Assigned" dropdown on each member record.</p>
+            <div className="assignee-list">
+              {connectGroups.map(g => (
+                <div key={g} className="assignee-row">
+                  <span className="assignee-avatar" style={{background:'#EAF3DE',color:'#2D6A2D'}}>{g.slice(0,2).toUpperCase()}</span>
+                  <span className="assignee-name">{g}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => removeConnectGroup(g)}>Remove</button>
+                </div>
+              ))}
+              {connectGroups.length === 0 && <p style={{padding:'12px',color:'var(--text-muted)',fontSize:13}}>No connect groups added yet.</p>}
+            </div>
+            <div className="add-assignee-row">
+              <input type="text" placeholder="Add group name (e.g. Tuesday Night Connect)" value={newConnectGroup} onChange={e => setNewConnectGroup(e.target.value)} onKeyDown={e => e.key === 'Enter' && addConnectGroup()} autoFocus />
+              <button className="btn btn-primary" onClick={addConnectGroup}>+ Add</button>
             </div>
             <div className="modal-footer"><button className="btn btn-primary" onClick={closeModal}>✓ Done</button></div>
           </div>
