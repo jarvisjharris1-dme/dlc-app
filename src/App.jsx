@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import "./App.css";
@@ -414,8 +413,20 @@ export default function App() {
     });
     const skipped = csvRows.length - toInsert.length;
     if (toInsert.length > 0) {
-      const { error } = await supabase.from('members').insert(toInsert);
-      if (error) { setError('Import failed: ' + (error.message || JSON.stringify(error))); setSaving(false); return; }
+      // Insert in chunks of 20 to avoid payload size issues
+      const chunkSize = 20;
+      let insertedCount = 0;
+      for (let i = 0; i < toInsert.length; i += chunkSize) {
+        const chunk = toInsert.slice(i, i + chunkSize);
+        const { data, error } = await supabase.from('members').insert(chunk).select();
+        if (error) {
+          setError('Import failed on row ' + (i+1) + ': ' + (error.message || JSON.stringify(error)));
+          setSaving(false);
+          await fetchAll();
+          return;
+        }
+        insertedCount += (data || chunk).length;
+      }
     }
     await fetchAll();
     setIResult({ added: toInsert.length, skipped });
@@ -547,12 +558,12 @@ export default function App() {
               <th>Member name</th><th>Enrolled</th>
               <th className="center">C1</th><th className="center">C2</th><th className="center">C3</th><th className="center">C4</th>
               <th className="center">Photo</th><th className="center">App</th><th className="center">Luncheon</th>
-              <th>Assigned to</th><th>Pastor</th><th>Cert. Date</th><th>Connect Group</th><th>Notes</th><th className="center">Initials</th><th>Status</th><th></th>
+              <th>Assigned to</th><th>Pastor</th><th>Cert. Date</th><th>Connect Group</th><th>Notes</th><th>Status</th><th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={17} className="empty">No members found for this filter</td></tr>
+              <tr><td colSpan={16} className="empty">No members found for this filter</td></tr>
             ) : filtered.map(m => {
               const s = completionStatus(m);
               return (
@@ -587,7 +598,7 @@ export default function App() {
                     </select>
                   </td>
                   <td><input className="inline-input" type="text" value={m.notes || ''} placeholder="Notes..." onChange={e => updateMember(m.id, { notes: e.target.value })} /></td>
-                  <td className="center"><input className="initials-input" type="text" maxLength={4} value={m.initials || ''} placeholder="Init." onChange={e => updateMember(m.id, { initials: e.target.value })} /></td>
+
                   <td><span className={`status-badge status-${s}`}>{completionLabel(m)}</span></td>
                   <td>
                     <div className="row-actions">
@@ -653,7 +664,7 @@ export default function App() {
               </div>
             </div>
             <div className="form-row"><label>Certificate date</label><input type="date" value={form.certificate_date || ''} onChange={e => setForm(f => ({ ...f, certificate_date: e.target.value || '' }))} style={{ width: 200 }} /></div>
-            <div className="form-row"><label>Teacher initials</label><input type="text" maxLength={4} value={form.initials || ''} onChange={e => setForm(f => ({ ...f, initials: e.target.value }))} style={{ width: 80, textAlign: 'center' }} /></div>
+
             <div className="form-row"><label>Notes</label><textarea rows={2} value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
             <div className="modal-footer">
               <button className="btn" onClick={closeModal}>Cancel</button>
@@ -835,3 +846,4 @@ export default function App() {
     </div>
   );
 }
+
