@@ -281,14 +281,18 @@ export default function App() {
   // Parse a messy date string — extracts just the date portion
   function parseDate(raw) {
     if (!raw) return '';
-    // Strip everything after the date (initials, notes like "CLvir", "acc", etc.)
-    const clean = raw.replace(/[a-zA-Z()><\/]/g, ' ').trim();
-    // Try MM/DD/YYYY
-    const m1 = clean.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+    // Match date pattern directly from raw string before stripping anything
+    // Handles: MM/DD/YYYY, M/D/YYYY, MM/DD/YY, MM-DD-YYYY
+    const m1 = raw.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
     if (m1) {
       let [, mo, dy, yr] = m1;
       if (yr.length === 2) yr = '20' + yr;
-      return `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+      // Validate ranges
+      const moN = parseInt(mo, 10);
+      const dyN = parseInt(dy, 10);
+      if (moN >= 1 && moN <= 12 && dyN >= 1 && dyN <= 31) {
+        return `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+      }
     }
     return '';
   }
@@ -849,5 +853,4 @@ export default function App() {
     </div>
   );
 }
-
 
