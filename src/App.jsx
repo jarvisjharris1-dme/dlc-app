@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+
+  import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import "./App.css";
 
@@ -29,7 +30,8 @@ const emptyMember = () => ({
   first_name: '', last_name: '', enroll_date: todayStr(),
   class_1: false, class_2: false, class_3: false, class_4: false,
   photo_taken: false, app_complete: false, luncheon_attended: false,
-  assigned_to: '', notes: '', initials: ''
+  assigned_to: '', notes: '', initials: '',
+  pastor_assigned: '', certificate_date: '', connect_group: ''
 });
 
 export default function App() {
@@ -41,6 +43,8 @@ export default function App() {
 
   const [members, setMembers] = useState([]);
   const [assignees, setAssignees] = useState([]);
+  const [pastors, setPastors] = useState([]);
+  const [connectGroups, setConnectGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -74,14 +78,18 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: mData, error: mErr }, { data: aData, error: aErr }] = await Promise.all([
+      const [{ data: mData, error: mErr }, { data: aData, error: aErr }, { data: pData, error: pErr }, { data: cgData, error: cgErr }] = await Promise.all([
         supabase.from('members').select('*').order('last_name', { ascending: true }).order('first_name', { ascending: true }),
         supabase.from('assignees').select('*').order('name'),
+        supabase.from('pastors').select('*').order('name'),
+        supabase.from('connect_groups').select('*').order('name'),
       ]);
       if (mErr) throw mErr;
       if (aErr) throw aErr;
       setMembers(mData || []);
       setAssignees((aData || []).map(a => a.name));
+      setPastors((pData || []).map(p => p.name));
+      setConnectGroups((cgData || []).map(g => g.name));
     } catch (e) {
       setError('Could not load data. Check your Supabase connection.');
     } finally {
@@ -97,6 +105,8 @@ export default function App() {
       .channel('dlc-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'assignees' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pastors' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'connect_groups' }, fetchAll)
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [fetchAll]);
@@ -191,14 +201,14 @@ export default function App() {
 
   // ── Export CSV ───────────────────────────────────────────────
   function exportCSV() {
-    const rows = [['First Name','Last Name','Enrollment Date','Class 1','Class 2','Class 3','Class 4','Classes Attended','Photo Taken','Application Complete','Luncheon Attended','Assigned To','Notes','Teacher Initials','Status']];
+    const rows = [['First Name','Last Name','Enrollment Date','Class 1','Class 2','Class 3','Class 4','Classes Attended','Photo Taken','Application Complete','Luncheon Attended','Assigned To','Pastor Assigned','Certificate Date','Connect Group','Notes','Teacher Initials','Status']];
     filtered.forEach(m => {
       const classes = [m.class_1, m.class_2, m.class_3, m.class_4];
       rows.push([m.first_name, m.last_name, m.enroll_date,
         ...classes.map(c => c ? 'Y' : 'N'),
         classes.filter(Boolean).length,
         m.photo_taken ? 'Y' : 'N', m.app_complete ? 'Y' : 'N', m.luncheon_attended ? 'Y' : 'N',
-        m.assigned_to || '', m.notes || '', m.initials || '', completionLabel(m)]);
+        m.assigned_to || '', m.pastor_assigned || '', m.certificate_date || '', m.connect_group || '', m.notes || '', m.initials || '', completionLabel(m)]);
     });
     const csv = rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
@@ -384,12 +394,12 @@ export default function App() {
               <th>Member name</th><th>Enrolled</th>
               <th className="center">C1</th><th className="center">C2</th><th className="center">C3</th><th className="center">C4</th>
               <th className="center">Photo</th><th className="center">App</th><th className="center">Luncheon</th>
-              <th>Assigned to</th><th>Notes</th><th className="center">Initials</th><th>Status</th><th></th>
+              <th>Assigned to</th><th>Pastor</th><th>Cert. Date</th><th>Connect Group</th><th>Notes</th><th className="center">Initials</th><th>Status</th><th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={14} className="empty">No members found for this filter</td></tr>
+              <tr><td colSpan={17} className="empty">No members found for this filter</td></tr>
             ) : filtered.map(m => {
               const s = completionStatus(m);
               return (
@@ -408,6 +418,19 @@ export default function App() {
                     <select className="inline-select" value={m.assigned_to || ''} onChange={e => updateMember(m.id, { assigned_to: e.target.value })}>
                       <option value="">Unassigned</option>
                       {assignees.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="inline-select" value={m.pastor_assigned || ''} onChange={e => updateMember(m.id, { pastor_assigned: e.target.value })}>
+                      <option value="">— None —</option>
+                      {pastors.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </td>
+                  <td><input className="inline-input" type="date" value={m.certificate_date || ''} onChange={e => updateMember(m.id, { certificate_date: e.target.value || null })} style={{width: 130}} /></td>
+                  <td>
+                    <select className="inline-select" value={m.connect_group || ''} onChange={e => updateMember(m.id, { connect_group: e.target.value })}>
+                      <option value="">— None —</option>
+                      {connectGroups.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </td>
                   <td><input className="inline-input" type="text" value={m.notes || ''} placeholder="Notes..." onChange={e => updateMember(m.id, { notes: e.target.value })} /></td>
@@ -459,6 +482,24 @@ export default function App() {
               <label className="check-label"><input type="checkbox" checked={form.app_complete} onChange={e => setForm(f => ({ ...f, app_complete: e.target.checked }))} /> App complete</label>
               <label className="check-label"><input type="checkbox" checked={form.luncheon_attended} onChange={e => setForm(f => ({ ...f, luncheon_attended: e.target.checked }))} /> Luncheon attended</label>
             </div>
+            <div className="section-divider">Assignments</div>
+            <div className="form-grid-2">
+              <div className="form-row">
+                <label>Pastor assigned</label>
+                <select value={form.pastor_assigned || ''} onChange={e => setForm(f => ({ ...f, pastor_assigned: e.target.value }))}>
+                  <option value="">— None —</option>
+                  {pastors.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div className="form-row">
+                <label>Connect group assigned</label>
+                <select value={form.connect_group || ''} onChange={e => setForm(f => ({ ...f, connect_group: e.target.value }))}>
+                  <option value="">— None —</option>
+                  {connectGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-row"><label>Certificate date</label><input type="date" value={form.certificate_date || ''} onChange={e => setForm(f => ({ ...f, certificate_date: e.target.value || '' }))} style={{ width: 200 }} /></div>
             <div className="form-row"><label>Teacher initials</label><input type="text" maxLength={4} value={form.initials || ''} onChange={e => setForm(f => ({ ...f, initials: e.target.value }))} style={{ width: 80, textAlign: 'center' }} /></div>
             <div className="form-row"><label>Notes</label><textarea rows={2} value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
             <div className="modal-footer">
