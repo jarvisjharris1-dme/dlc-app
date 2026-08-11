@@ -296,7 +296,7 @@ export default function App() {
       const ln = (row[csvMap.ln] || '').trim();
       if (!fn || !ln) return;
       if (members.some(m => m.first_name.toLowerCase() === fn.toLowerCase() && m.last_name.toLowerCase() === ln.toLowerCase())) return;
-      toInsert.push({ first_name: fn, last_name: ln, enroll_date: (row[csvMap.ed] || '').trim() || todayStr(), class_1: false, class_2: false, class_3: false, class_4: false, photo_taken: false, app_complete: false, luncheon_attended: false, assigned_to: '', notes: '', initials: '' });
+      toInsert.push({ first_name: fn, last_name: ln, enroll_date: (row[csvMap.ed] || '').trim() || todayStr(), class_1: false, class_2: false, class_3: false, class_4: false, photo_taken: false, app_complete: false, luncheon_attended: false, assigned_to: '', notes: '', initials: '', pastor_assigned: '', certificate_date: null, connect_group: '' });
     });
     const skipped = csvRows.length - toInsert.length;
     if (toInsert.length > 0) {
@@ -721,3 +721,4 @@ export default function App() {
     </div>
   );
 }
+
