@@ -57,7 +57,7 @@ export default function DivineLifeShell(){
           <img className="dlc-portal-logo" src="/dlclogo.png" alt="Divine Life Church" />
           <div className="dlc-portal-title"><span>DIVINE LIFE</span><strong>CONNECT</strong></div>
           <div className="dlc-gold-rule"><span>◇</span></div>
-          <p>Welcome to the Divine Life Connect Team Portal.<br/>Select your ministry area to get started.</p>
+          <p>Welcome to the Divine Life Elite Team Portal.<br/>Select your ministry area to get started.</p>
         </header>
 
         <section className="dlc-ministry-grid">
