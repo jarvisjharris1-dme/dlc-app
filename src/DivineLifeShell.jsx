@@ -46,7 +46,7 @@ export default function DivineLifeShell(){
     lowStock:guestInventory.filter(i=>i.quantity<=i.minimum_quantity).length
   }),[guestVisits,guestOutreach,guestInventory,today]);
 
-  if(area==='connect') return <div><button className="dlc-home-float" onClick={()=>setArea('entry')}>← Divine Life Connect</button><ConnectTeamShell/></div>;
+  if(area==='connect') return <ConnectTeamShell onHome={()=>setArea('entry')}/>;
   if(area==='guest') return <GuestReceptionApp onHome={()=>setArea('entry')}/>;
 
   return (
