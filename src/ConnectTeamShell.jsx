@@ -25,7 +25,7 @@ function relabelPastorsAndElders(root){
   });
 }
 
-export default function ConnectTeamShell(){
+export default function ConnectTeamShell({ onHome }){
   const [inventoryOpen,setInventoryOpen] = useState(false);
   const [items,setItems] = useState([]);
   const [editing,setEditing] = useState(null);
@@ -86,6 +86,7 @@ export default function ConnectTeamShell(){
 
   return <div className="ct-shell-wrap">
     <ConnectTeamApp />
+    <button className="dlc-home-float" onClick={onHome}>← Divine Life Connect</button>
     <button className="ct-inventory-launch" onClick={()=>setInventoryOpen(true)}>📦 Inventory</button>
 
     {inventoryOpen && <div className="ct-modal-bg" onClick={e=>e.target===e.currentTarget&&setInventoryOpen(false)}>
