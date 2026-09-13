@@ -334,9 +334,13 @@ export default function App() {
       });
 
       setCsvRows(rows);
+      // Auto-detect: if there's a column called 'name' use it as fn, skip ln
+      const nameCol = headers.find(h => /^name$/i.test(h.trim()));
+      const firstCol = headers.find(h => /first/i.test(h));
+      const lastCol = headers.find(h => /last/i.test(h));
       setCsvMap({
-        fn: headers[0] || '',
-        ln: headers[1] || '',
+        fn: nameCol || firstCol || headers[0] || '',
+        ln: nameCol ? '' : (lastCol || headers[1] || ''),
         ed: headers.find(h => /date.joined|enroll|date/i.test(h)) || headers[3] || '',
       });
       setIStep(2);
@@ -344,10 +348,21 @@ export default function App() {
     reader.readAsText(file);
   }
 
+  function splitName(raw) {
+    const parts = (raw || '').trim().split(/\s+/);
+    if (parts.length === 1) return { fn: parts[0], ln: '' };
+    return { fn: parts[0], ln: parts.slice(1).join(' ') };
+  }
+
   function buildPreview() {
     const prev = csvRows.slice(0, 5).map(row => {
-      const fn = (row[csvMap.fn] || '').trim();
-      const ln = (row[csvMap.ln] || '').trim();
+      let fn = (row[csvMap.fn] || '').trim();
+      let ln = csvMap.ln ? (row[csvMap.ln] || '').trim() : '';
+      // If no last name column mapped, split the full name
+      if (!ln && fn.includes(' ')) {
+        const split = splitName(fn);
+        fn = split.fn; ln = split.ln;
+      }
       const dup = members.some(m => m.first_name.toLowerCase().trim() === fn.toLowerCase() && m.last_name.toLowerCase().trim() === ln.toLowerCase());
       const ed = parseDate(row[csvMap.ed] || '') || todayStr();
       return { fn, ln, ed, dup };
@@ -359,9 +374,14 @@ export default function App() {
     setSaving(true);
     const toInsert = [];
     csvRows.forEach(row => {
-      const fn = (row[csvMap.fn] || '').trim();
-      const ln = (row[csvMap.ln] || '').trim();
-      if (!fn || !ln) return;
+      let fn = (row[csvMap.fn] || '').trim();
+      let ln = csvMap.ln ? (row[csvMap.ln] || '').trim() : '';
+      // If no last name column, split the full name
+      if (!ln && fn.includes(' ')) {
+        const split = splitName(fn);
+        fn = split.fn; ln = split.ln;
+      }
+      if (!fn) return;
       if (members.some(m => m.first_name.toLowerCase().trim() === fn.toLowerCase() && m.last_name.toLowerCase().trim() === ln.toLowerCase())) return;
 
       // Smart field detection — works with Shelby Next AND the DLC tracker format
@@ -781,15 +801,17 @@ export default function App() {
                 <div className="steps-row">{['Upload','Map','Preview','Done'].map((l,i)=><span key={l} className={`step ${i===1?'step-active':i<1?'step-done':'step-inactive'}`}><span className="step-num">{i<1?'✓':i+1}</span>{l}</span>)}</div>
                 <p className="modal-sub"><strong>{csvRows.length} rows</strong> found. Match your CSV columns below.</p>
                 <div className="field-map">
-                  {[['fn','First name *'],['ln','Last name *'],['ed','Enrollment date']].map(([key,label])=>(
+                  {[['fn','Full name (or First name) *'],['ln','Last name (if separate, leave blank if not)'],['ed','Enrollment date']].map(([key,label])=>(
                     <div key={key} className="field-row">
                       <span className="field-label">{label}</span><span className="arrow">→</span>
                       <select value={csvMap[key]} onChange={e=>setCsvMap(m=>({...m,[key]:e.target.value}))}>
+                        <option value="">— skip —</option>
                         {csvHeaders.map(h=><option key={h} value={h}>{h}</option>)}
                       </select>
                     </div>
                   ))}
                 </div>
+                <p style={{fontSize:12,color:'var(--text-muted)',marginTop:8}}>💡 If your CSV has a single Name column, map it to Full name and leave Last name as skip — names will be split automatically.</p>
                 <div className="modal-footer modal-footer-split">
                   <button className="btn" onClick={()=>setIStep(1)}>← Back</button>
                   <button className="btn btn-primary" onClick={buildPreview}>Preview →</button>
@@ -799,8 +821,8 @@ export default function App() {
                 <div className="steps-row">{['Upload','Map','Preview','Done'].map((l,i)=><span key={l} className={`step ${i===2?'step-active':i<2?'step-done':'step-inactive'}`}><span className="step-num">{i<2?'✓':i+1}</span>{l}</span>)}</div>
                 <p className="modal-sub">Preview of first {iPreview.length} rows.</p>
                 <table className="preview-table">
-                  <thead><tr><th>First</th><th>Last</th><th>Date</th><th>Status</th></tr></thead>
-                  <tbody>{iPreview.map((r,i)=><tr key={i} className={r.dup?'dup-row':''}><td>{r.fn||'—'}</td><td>{r.ln||'—'}</td><td>{r.ed}</td><td className={r.dup?'dup-text':'new-text'}>{r.dup?'Duplicate':'New'}</td></tr>)}</tbody>
+                  <thead><tr><th>Name</th><th>Date</th><th>Status</th></tr></thead>
+                  <tbody>{iPreview.map((r,i)=><tr key={i} className={r.dup?'dup-row':''}><td>{(r.fn+' '+r.ln).trim()||'—'}</td><td>{r.ed}</td><td className={r.dup?'dup-text':'new-text'}>{r.dup?'Duplicate':'New'}</td></tr>)}</tbody>
                 </table>
                 <div className="modal-footer modal-footer-split">
                   <button className="btn" onClick={()=>setIStep(2)}>← Back</button>
