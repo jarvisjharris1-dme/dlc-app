@@ -241,14 +241,14 @@ export default function App() {
 
   // ── Export CSV ───────────────────────────────────────────────────────────────
   function exportCSV() {
-    const rows = [['First Name','Last Name','Enrollment Date','Class 1','Class 2','Class 3','Class 4','Classes Attended','Photo Taken','Application Complete','Luncheon Attended','Assigned To','Pastor Assigned','Certificate Date','Connect Group','Notes','Teacher Initials','Status']];
+    const rows = [['Name','Enrollment Date','Class 1','Class 2','Class 3','Class 4','Classes Attended','Photo Taken','Application Complete','Luncheon Attended','Assigned To','Pastor Assigned','Certificate Date','Connect Group','Notes','Status']];
     filtered.forEach(m => {
       const classes = [m.class_1, m.class_2, m.class_3, m.class_4];
-      rows.push([m.first_name, m.last_name, m.enroll_date,
+      rows.push([`${m.first_name} ${m.last_name}`, m.enroll_date,
         ...classes.map(c => c ? 'Y' : 'N'),
         classes.filter(Boolean).length,
         m.photo_taken ? 'Y' : 'N', m.app_complete ? 'Y' : 'N', m.luncheon_attended ? 'Y' : 'N',
-        m.assigned_to || '', m.pastor_assigned || '', m.certificate_date || '', m.connect_group || '', m.notes || '', m.initials || '', completionLabel(m)]);
+        m.assigned_to || '', m.pastor_assigned || '', m.certificate_date || '', m.connect_group || '', m.notes || '', completionLabel(m)]);
     });
     const csv = rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
@@ -853,4 +853,3 @@ export default function App() {
     </div>
   );
 }
-
